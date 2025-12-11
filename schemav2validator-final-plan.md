@@ -247,11 +247,11 @@ func (c *schemaCache) loadSchemaFromPath(ctx context.Context, schemaPath string,
 
 	// Check cache first
 	if doc, found := c.get(urlHash); found {
-		log.Debugf(ctx, "schema cache hit for: %s", schemaPath)
+		log.Debugf(ctx, "Schema cache hit for: %s", schemaPath)
 		return doc, nil
 	}
 
-	log.Debugf(ctx, "schema cache miss, loading from: %s", schemaPath)
+	log.Debugf(ctx, "Schema cache miss, loading from: %s", schemaPath)
 
 	// Validate path format
 	if !isValidSchemaPath(schemaPath) {
@@ -281,17 +281,17 @@ func (c *schemaCache) loadSchemaFromPath(ctx context.Context, schemaPath string,
 	}
 
 	if err != nil {
-		log.Errorf(ctx, err, "failed to load schema from: %s", schemaPath)
+		log.Errorf(ctx, err, "Failed to load schema from: %s", schemaPath)
 		return nil, fmt.Errorf("failed to load schema from %s: %w", schemaPath, err)
 	}
 
 	// Validate loaded schema (non-blocking, just log warnings)
 	if err := doc.Validate(ctx); err != nil {
-		log.Debugf(ctx, "schema validation warnings for %s: %v", schemaPath, err)
+		log.Debugf(ctx, "Schema validation warnings for %s: %v", schemaPath, err)
 	}
 
 	c.set(urlHash, doc, ttl)
-	log.Infof(ctx, "loaded and cached schema from: %s", schemaPath)
+	log.Debugf(ctx, "Loaded and cached schema from: %s", schemaPath)
 
 	return doc, nil
 }
@@ -393,13 +393,13 @@ func (c *schemaCache) validateReferencedObject(
 ) error {
 	// Domain whitelist check
 	if !isAllowedDomain(obj.Context, allowedDomains) {
-		log.Warnf(ctx, "domain not in whitelist: %s", obj.Context)
+		log.Warnf(ctx, "Domain not in whitelist: %s", obj.Context)
 		return fmt.Errorf("domain not allowed: %s", obj.Context)
 	}
 
 	// Transform @context to schema path (URL or file)
 	schemaPath := transformContextToSchemaURL(obj.Context, urlTransform)
-	log.Debugf(ctx, "transformed %s -> %s", obj.Context, schemaPath)
+	log.Debugf(ctx, "Transformed %s -> %s", obj.Context, schemaPath)
 
 	// Load schema with timeout (supports URL or local file)
 	doc, err := c.loadSchemaFromPath(ctx, schemaPath, ttl, timeout)
@@ -410,7 +410,7 @@ func (c *schemaCache) validateReferencedObject(
 	// Find schema by @type
 	schema, err := findSchemaByType(doc, obj.Type)
 	if err != nil {
-		log.Errorf(ctx, err, "schema not found for @type: %s at path: %s", obj.Type, obj.Path)
+		log.Errorf(ctx, err, "Schema not found for @type: %s at path: %s", obj.Type, obj.Path)
 		return fmt.Errorf("at %s: %w", obj.Path, err)
 	}
 
@@ -420,11 +420,11 @@ func (c *schemaCache) validateReferencedObject(
 		openapi3.EnableFormatValidation(),
 	}
 	if err := schema.Value.VisitJSON(obj.Data, opts...); err != nil {
-		log.Debugf(ctx, "validation failed for @type: %s at path: %s: %v", obj.Type, obj.Path, err)
+		log.Debugf(ctx, "Validation failed for @type: %s at path: %s: %v", obj.Type, obj.Path, err)
 		return fmt.Errorf("at %s: %w", obj.Path, err)
 	}
 
-	log.Debugf(ctx, "validation passed for @type: %s at path: %s", obj.Type, obj.Path)
+	log.Debugf(ctx, "Validation passed for @type: %s at path: %s", obj.Type, obj.Path)
 	return nil
 }
 ```
@@ -449,7 +449,7 @@ func New(ctx context.Context, config *Config) (*schemav2Validator, func() error,
 			maxSize = config.ReferencedSchemaConfig.MaxCacheSize
 		}
 		v.schemaCache = newSchemaCache(maxSize)
-		log.Infof(ctx, "initialized referenced schema cache with max size: %d", maxSize)
+		log.Infof(ctx, "Initialized referenced schema cache with max size: %d", maxSize)
 	}
 
 	if err := v.initialise(ctx); err != nil {
@@ -490,7 +490,7 @@ func (v *schemav2Validator) refreshLoop(ctx context.Context) {
 				if v.schemaCache != nil {
 					count := v.schemaCache.cleanupExpired()
 					if count > 0 {
-						log.Debugf(ctx, "cleaned up %d expired referenced schemas", count)
+						log.Debugf(ctx, "Cleaned up %d expired referenced schemas", count)
 					}
 				}
 			}
@@ -547,11 +547,11 @@ func (v *schemav2Validator) validateReferencedSchemas(ctx context.Context, body 
 	objects := findReferencedObjects(message, "message")
 
 	if len(objects) == 0 {
-		log.Debugf(ctx, "no objects with @context found in message, skipping LEVEL 2 validation")
+		log.Debugf(ctx, "No objects with @context found in message, skipping LEVEL 2 validation")
 		return nil
 	}
 
-	log.Infof(ctx, "found %d objects with @context for LEVEL 2 validation", len(objects))
+	log.Debugf(ctx, "Found %d objects with @context for LEVEL 2 validation", len(objects))
 
 	// Get config with defaults
 	urlTransform := "context.jsonld->attributes.yaml"
@@ -577,7 +577,7 @@ func (v *schemav2Validator) validateReferencedSchemas(ctx context.Context, body 
 	// Validate each object and collect errors
 	var errors []string
 	for _, obj := range objects {
-		log.Debugf(ctx, "validating object at path: %s, @context: %s, @type: %s",
+		log.Debugf(ctx, "Validating object at path: %s, @context: %s, @type: %s",
 			obj.Path, obj.Context, obj.Type)
 
 		if err := v.schemaCache.validateReferencedObject(ctx, obj, urlTransform, ttl, timeout, allowedDomains); err != nil {
