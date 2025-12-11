@@ -646,14 +646,6 @@ func (vp schemav2ValidatorProvider) New(ctx context.Context, config map[string]s
 
 	// NEW: Parse referencedSchemaConfig (if enabled)
 	if cfg.EnableReferencedSchemas {
-		// Set defaults
-		cfg.ReferencedSchemaConfig = schemav2validator.ReferencedSchemaConfig{
-			CacheTTL:        86400, // 24 hours
-			MaxCacheSize:    100,
-			DownloadTimeout: 30,
-			URLTransform:    "context.jsonld->attributes.yaml",
-		}
-
 		if v, ok := config["referencedSchemaConfig.cacheTTL"]; ok {
 			if ttl, err := strconv.Atoi(v); err == nil && ttl > 0 {
 				cfg.ReferencedSchemaConfig.CacheTTL = ttl
