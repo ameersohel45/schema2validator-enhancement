@@ -34,11 +34,12 @@ Request → Validate()
 
 | File | Action | Purpose |
 |------|--------|---------|
-| `schemav2validator.go` | **MODIFY** | Add all Level 2 code (config, cache, helpers, validation) |
+| `schemav2validator.go` | **MODIFY** | Core plugin lifecycle and Level 1 validation |
+| `extended_schema.go` | **NEW** | All Extended Schema (Level 2) logic (structs, cache, validation) |
 | `cmd/plugin.go` | **MODIFY** | Parse new config fields |
 | `config/local-simple.yaml` | **UPDATE** | Add example config |
 
-> **Note:** All Level 2 code goes in `schemav2validator.go` (single file approach, following existing codebase pattern)
+> **Note:** The implementation is split into two files in the same package for better maintainability.
 
 ---
 
@@ -55,11 +56,49 @@ Request → Validate()
 
 ---
 
+## `pkg/plugin/implementation/schemav2validator/extended_schema.go` (NEW)
+
+### Overview
+This new file contains all the logic for Extended Schema validation.
+
+### Structs
+```go
+// ExtendedSchemaConfig holds configuration for referenced schema validation.
+type ExtendedSchemaConfig struct {
+	CacheTTL        int      // seconds, default 86400 (24h)
+	MaxCacheSize    int      // default 100
+	DownloadTimeout int      // seconds, default 30
+	AllowedDomains  []string // whitelist (empty = all allowed)
+}
+
+// referencedObject represents ANY object with @context in the request.
+type referencedObject struct {
+	Path    string
+	Context string
+	Type    string
+	Data    map[string]interface{}
+}
+
+// schemaCache caches loaded domain schemas with LRU eviction.
+type schemaCache struct {
+	mu      sync.RWMutex
+	schemas map[string]*cachedDomainSchema
+	maxSize int
+}
+```
+
+### Key Methods
+*   `validateExtendedSchemas(ctx, body)`: Main entry point.
+*   `validateReferencedObject(...)`: Validates a single object.
+*   `transformContextToSchemaURL(...)`: Hardcoded transformation.
+*   `findSchemaByType(...)`: Resolution logic.
+
+---
+
 ## `pkg/plugin/implementation/schemav2validator/schemav2validator.go` (MODIFY)
 
 ### Overview of Changes
-
-The following code sections will be **ADDED** to the existing `schemav2validator.go` file. Existing code remains unchanged.
+Modified to initialize the extended schema cache and call the validation method.
 
 ---
 
@@ -551,19 +590,14 @@ func (v *schemav2Validator) validateReferencedSchemas(ctx context.Context, body 
 	log.Debugf(ctx, "Extended Schema config: ttl=%v, timeout=%v, allowedDomains=%v",
 		ttl, timeout, allowedDomains)
 
-	// Validate each object and collect errors
-	var errors []string
+	// Validate each object
 	for _, obj := range objects {
 		log.Debugf(ctx, "Validating object at path: %s, @context: %s, @type: %s",
 			obj.Path, obj.Context, obj.Type)
 
 		if err := v.schemaCache.validateReferencedObject(ctx, obj, ttl, timeout, allowedDomains); err != nil {
-			errors = append(errors, err.Error())
+			return err
 		}
-	}
-
-	if len(errors) > 0 {
-		return fmt.Errorf("validation errors:\n  - %s", strings.Join(errors, "\n  - "))
 	}
 
 	return nil
